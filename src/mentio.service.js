@@ -1,12 +1,15 @@
 'use strict';
 
 angular.module('mentio')
-    .factory('mentioUtil', function ($window, $location, $anchorScroll, $timeout) {
+    .factory('mentioUtil', ["$window", "$location", "$anchorScroll", "$timeout", function ($window, $location, $anchorScroll, $timeout) {
 
         // public
         function popUnderMention (ctx, triggerCharSet, selectionEl, requireLeadingSpace) {
             var coordinates;
             var mentionInfo = getTriggerInfo(ctx, triggerCharSet, requireLeadingSpace, false);
+            var pointerSpacerX = -14; // make room for pointer
+            var pointerSpacerY = 13;
+            var pointerSpacerTopY = 28; // move the popup up by this amount when positioning above the line
 
             if (mentionInfo !== undefined) {
 
@@ -16,6 +19,10 @@ angular.module('mentio')
                 } else {
                     coordinates = getContentEditableCaretPosition(ctx, mentionInfo.mentionPosition);
                 }
+
+                // add space for pointer:
+                coordinates.top += pointerSpacerY;
+                coordinates.left += pointerSpacerX;
 
                 // Move the button into place.
                 selectionEl.css({
@@ -27,7 +34,7 @@ angular.module('mentio')
                 });
 
                 $timeout(function(){
-                    scrollIntoView(ctx, selectionEl);
+                    scrollIntoView(ctx, selectionEl, coordinates, pointerSpacerTopY);
                 },0);
             } else {
                 selectionEl.css({
@@ -36,7 +43,7 @@ angular.module('mentio')
             }
         }
 
-        function scrollIntoView(ctx, elem)
+        function scrollIntoView(ctx, elem, coordinates, pointerSpacerTopY)
         {
             // cheap hack in px - need to check styles relative to the element
             var reasonableBuffer = 20;
@@ -54,18 +61,54 @@ angular.module('mentio')
             }
             var elemTop = clientRect.top;
             var elemBottom = elemTop + clientRect.height;
+            elem.removeClass("pointer-bottom");
+
             if(elemTop < 0) {
                 $window.scrollTo(0, $window.pageYOffset + clientRect.top - reasonableBuffer);
             } else if (elemBottom > $window.innerHeight) {
-                var maxY = $window.pageYOffset + clientRect.top - reasonableBuffer;
-                if (maxY - $window.pageYOffset > maxScrollDisplacement) {
-                    maxY = $window.pageYOffset + maxScrollDisplacement;
+                var newTop = coordinates.top - parseInt(coordinates.computed.fontSize) - clientRect.height - pointerSpacerTopY;
+                var baseHeight = coordinates.top - parseInt(coordinates.computed.fontSize) - pointerSpacerTopY;
+                elem.css({
+                    top: newTop + 'px'
+                }).addClass('pointer-bottom')
+                  .data("baseHeight",baseHeight);
+            }
+            // check if over too far to the right, and nudge left if necessary
+            var el_left = parseFloat(elem[0].style.left);
+            var el_width = elem.width();
+            var viewport_width = $window.innerWidth;
+            if (el_left + el_width + reasonableBuffer > viewport_width){
+                var nudge = ((el_left + el_width + reasonableBuffer) - viewport_width);
+                elem[0].style.left = el_left - nudge;
+                elem.find(".pointerbox").css({'transform':'translate(' + nudge + 'px,0)'});
+            } else {
+                elem.find(".pointerbox").css({'transform':'translate(0px,0)'});
+            }
+        }
+
+        function repositionMenu(elem){
+            var baseHeight;
+            if (elem.hasClass("pointer-bottom")){
+                baseHeight = elem.data("baseHeight");
+                var clientRect;
+                var e = elem[0];
+                while (clientRect === undefined || clientRect.height === 0) {
+                    clientRect = e.getBoundingClientRect();
+                    if (clientRect.height === 0) {
+                        e = e.childNodes[0];
+                        if (e === undefined || !e.getBoundingClientRect) {
+                            return;
+                        }
+                    }
                 }
-                var targetY = $window.pageYOffset - ($window.innerHeight - elemBottom);
-                if (targetY > maxY) {
-                    targetY = maxY;
+                var elemTop = clientRect.top;
+                var elemBottom = elemTop + clientRect.height;
+                if (elemBottom !== baseHeight){
+                    var newTop = baseHeight - clientRect.height;
+                    elem.css({
+                        top: newTop + 'px'
+                    });
                 }
-                $window.scrollTo(0, targetY);
             }
         }
 
@@ -535,7 +578,8 @@ angular.module('mentio')
 
             var coordinates = {
                 top: span.offsetTop + parseInt(computed.borderTopWidth) + parseInt(computed.fontSize),
-                left: span.offsetLeft + parseInt(computed.borderLeftWidth)
+                left: span.offsetLeft + parseInt(computed.borderLeftWidth),
+                computed: computed
             };
 
             localToGlobalCoordinates(ctx, element, coordinates);
@@ -553,6 +597,7 @@ angular.module('mentio')
             getMacroMatch: getMacroMatch,
             getTriggerInfo: getTriggerInfo,
             selectElement: selectElement,
+            repositionMenu: repositionMenu,
 
 
 
@@ -567,4 +612,4 @@ angular.module('mentio')
             resetSelection: resetSelection,
             scrollIntoView: scrollIntoView
         };
-    });
+    }]);

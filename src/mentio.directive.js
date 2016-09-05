@@ -18,7 +18,7 @@ angular.module('mentio', [])
                 trimTerm: '=mentioTrimTerm',
                 ngModel: '='
             },
-            controller: function($scope, $timeout, $attrs) {
+            controller: ["$scope", "$timeout", "$attrs", function($scope, $timeout, $attrs) {
 
                 $scope.query = function (triggerChar, triggerText) {
                     var remoteScope = $scope.triggerCharMap[triggerChar];
@@ -242,7 +242,7 @@ angular.module('mentio', [])
                         }
                     }
                 );
-            },
+            }],
             link: function (scope, element, attrs) {
                 scope.triggerCharMap = {};
 
@@ -453,8 +453,8 @@ angular.module('mentio', [])
         };
     }])
 
-    .directive('mentioMenu', ['mentioUtil', '$rootScope', '$log', '$window', '$document',
-        function (mentioUtil, $rootScope, $log, $window, $document) {
+    .directive('mentioMenu', ['mentioUtil', '$rootScope', '$log', '$window', '$document', '$timeout',
+        function (mentioUtil, $rootScope, $log, $window, $document, $timeout) {
         return {
             restrict: 'E',
             scope: {
@@ -468,7 +468,7 @@ angular.module('mentio', [])
             templateUrl: function(tElement, tAttrs) {
                 return tAttrs.mentioTemplateUrl !== undefined ? tAttrs.mentioTemplateUrl : 'mentio-menu.tpl.html';
             },
-            controller: function ($scope) {
+            controller: ["$scope", function ($scope) {
                 $scope.visible = false;
 
                 // callable both with controller (menuItem) and without controller (local)
@@ -534,7 +534,7 @@ angular.module('mentio', [])
                     $scope.parentMentio = scope;
                     $scope.targetElement = scope.targetElement;
                 };
-            },
+            }],
 
             link: function (scope, element) {
                 element[0].parentNode.removeChild(element[0]);
@@ -572,12 +572,19 @@ angular.module('mentio', [])
                     }
                 );
 
-                scope.$watch('items', function (items) {
+                scope.$watch('items', function (items, oldItems) {
                     if (items && items.length > 0) {
                         scope.activate(items[0]);
                         if (!scope.visible && scope.requestVisiblePendingSearch) {
                             scope.visible = true;
                             scope.requestVisiblePendingSearch = false;
+                        }
+                        if (oldItems && oldItems.length){
+                            if (items.length < 5 || oldItems.length < 5 ){
+                                $timeout(function(){
+                                    mentioUtil.repositionMenu(element);
+                                },0);
+                            }
                         }
                     } else {
                         scope.hideMenu();
@@ -658,11 +665,11 @@ angular.module('mentio', [])
             }
         };
     })
-    .filter('unsafe', function($sce) {
+    .filter('unsafe', ["$sce", function($sce) {
         return function (val) {
             return $sce.trustAsHtml(val);
         };
-    })
+    }])
     .filter('mentioHighlight', function() {
         function escapeRegexp (queryToEscape) {
             return queryToEscape.replace(/([.?*+^$[\]\\(){}|-])/g, '\\$1');
