@@ -194,54 +194,57 @@ angular.module('mentio', [])
                     }
                 );
 
-                $document.on(
-                    'click', function () {
-                        if ($scope.isActive()) {
-                            $scope.$apply(function () {
-                                $scope.hideAll();
+                function clickEventHandler() {
+                    if ($scope.isActive()) {
+                        $scope.$apply(function () {
+                            $scope.hideAll();
+                        });
+                    }
+                }
+                function keyEventHandler(event) {
+                    var activeMenuScope = $scope.getActiveMenuScope();
+                    if (activeMenuScope) {
+                        if (event.which === 9 || event.which === 13) {
+                            event.preventDefault();
+                            activeMenuScope.selectActive();
+                        }
+
+                        if (event.which === 27) {
+                            event.preventDefault();
+                            activeMenuScope.$apply(function () {
+                                activeMenuScope.hideMenu();
                             });
                         }
-                    }
-                );
 
-                $document.on(
-                    'keydown keypress paste', function (event) {
-                        var activeMenuScope = $scope.getActiveMenuScope();
-                        if (activeMenuScope) {
-                            if (event.which === 9 || event.which === 13) {
-                                event.preventDefault();
-                                activeMenuScope.selectActive();
-                            }
+                        if (event.which === 40) {
+                            event.preventDefault();
+                            activeMenuScope.$apply(function () {
+                                activeMenuScope.activateNextItem();
+                            });
+                            activeMenuScope.adjustScroll(1);
+                        }
 
-                            if (event.which === 27) {
-                                event.preventDefault();
-                                activeMenuScope.$apply(function () {
-                                    activeMenuScope.hideMenu();
-                                });
-                            }
+                        if (event.which === 38) {
+                            event.preventDefault();
+                            activeMenuScope.$apply(function () {
+                                activeMenuScope.activatePreviousItem();
+                            });
+                            activeMenuScope.adjustScroll(-1);
+                        }
 
-                            if (event.which === 40) {
-                                event.preventDefault();
-                                activeMenuScope.$apply(function () {
-                                    activeMenuScope.activateNextItem();
-                                });
-                                activeMenuScope.adjustScroll(1);
-                            }
-
-                            if (event.which === 38) {
-                                event.preventDefault();
-                                activeMenuScope.$apply(function () {
-                                    activeMenuScope.activatePreviousItem();
-                                });
-                                activeMenuScope.adjustScroll(-1);
-                            }
-
-                            if (event.which === 37 || event.which === 39) {
-                                event.preventDefault();
-                             }
+                        if (event.which === 37 || event.which === 39) {
+                            event.preventDefault();
                         }
                     }
-                );
+                }
+                $document.on('click', clickEventHandler);
+                $document.on('keydown keypress paste', keyEventHandler);
+
+                $scope.$on('$destroy', function() {
+                    $document.off('click', clickEventHandler);
+                    $document.off('keydown keypress paste', keyEventHandler);
+                });
+
             }],
             link: function (scope, element, attrs) {
                 scope.triggerCharMap = {};
@@ -561,16 +564,19 @@ angular.module('mentio', [])
                         });
                 }
 
-                angular.element($window).bind(
-                    'resize', function () {
-                        if (scope.isVisible()) {
-                            var triggerCharSet = [];
-                            triggerCharSet.push(scope.triggerChar);
-                            mentioUtil.popUnderMention(scope.parentMentio.context(),
-                                triggerCharSet, element, scope.requireLeadingSpace);
-                        }
+                function resizeWindowHandler() {
+                    if (scope.isVisible()) {
+                        var triggerCharSet = [];
+                        triggerCharSet.push(scope.triggerChar);
+                        mentioUtil.popUnderMention(scope.parentMentio.context(),
+                          triggerCharSet, element, scope.requireLeadingSpace);
                     }
-                );
+                }
+
+                angular.element($window).bind('resize', resizeWindowHandler);
+                scope.$on('$destroy', function(){
+                    angular.element($window).unbind('resize', resizeWindowHandler);
+                });
 
                 scope.$watch('items', function (items, oldItems) {
                     if (items && items.length > 0) {
